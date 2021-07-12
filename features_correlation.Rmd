@@ -1,0 +1,77 @@
+---
+title: "Features Correlation"
+output: word_document
+---
+
+```{r}
+setwd("C:/Users/Delouche Alexis/Desktop/stage")
+wd<-getwd()
+#loading the network
+datapath<-paste0(wd,"/data/PCHiC_peak_matrix_cutoff5_Mono.tsv")
+pchic<-read.table(datapath, header = TRUE)
+
+#filtering the network datas
+pchic=pchic[which(pchic$Mon>=5),]
+pchic=pchic[which(pchic$oeName!="."),]
+
+#making a chromnet Object
+net<-chaser::make_chromnet(pchic[,c(1,2,3,6,7,8)])
+```
+
+
+```{r}
+datapath<-paste0(wd,"/data/new_feature_gene_age.txt")
+gene_age<-read.table(datapath, header=TRUE)
+net<-chaser::load_features(net,gene_age,type="features_table", missingv="1" ,auxfun = "mean")
+datapath<-paste0(wd,"/data/Monocytes_Exp_EV.txt")
+exp_vexp<-read.table(datapath, header=TRUE)
+net<-chaser::load_features(net,exp_vexp,type="features_table", missingv=0 ,auxfun = "mean")
+datapath<-paste0(wd,"/data/Features_table_EV_scMono.txt")
+single_cell<-read.table(datapath, header=TRUE)
+net<-chaser::load_features(net,single_cell,type="features_table", missingv=0 ,auxfun = "mean")
+```
+
+
+```{r}
+net$features <- apply(net$features[,c(1:18)], MARGIN = c(1,2), FUN = as.integer)
+net_chas<-chaser::chas(net)
+random_net<-chaser::randomize(net,nrandom=10, dist.match = TRUE)
+random_net_chas=lapply(random_net,chas)
+```
+
+```{r}
+moy <- mean(c(unlist(random_net_chas),net_chas),na.rm=TRUE)
+SD <- sd(c(unlist(random_net_chas),net_chas),na.rm=TRUE)
+zscore <- (net_chas-moy)/SD
+zscore
+barplot(zscore, col="red")
+```
+
+```{r}
+plotchas<-function(feat, chas, randfeat,randchas, xmin, xmax, ymin, ymax, title){
+  if(missing(xmin)) {
+    xmin=min(unlist(lapply(randfeat, colMeans)))
+  }
+  if(missing(xmax)){
+    xmax=max(unlist(lapply(randfeat, colMeans)))
+  }
+  if(missing(ymin)) {
+    ymin=min(unlist(randchas))
+  }
+  if(missing(ymax)){
+    ymax=max(unlist(randchas))
+  }
+  if(missing(ymax)){
+    title='ChAs Plot'
+  }
+  cols=rainbow(length(chas))
+  par(oma=c(1,1,1,1))
+  #plotting the mean value of gene age? Why? What does it tell us?  
+  plot(colMeans(feat, na.rm=11),chas, pch=20,xlab='Gene age', ylab='ChAs', cex.axis=1.5, cex.lab=1.5, xlim=c(xmin, xmax), ylim=c(ymin, ymax), col=cols, main=title)
+  text(colMeans(feat),chas,labels=colnames(feat), pos=3,  cex=0.5)
+  for (i in 1:length(randchas)){
+    points( colMeans(randfeat[[i]]$features,na.rm=11),unlist(randchas[[i]]),  col=cols)
+  }
+}
+plotchas(net$features, net_chas, random_net, random_net_chas,xmin=0, xmax=5, ymin=-0.05, ymax=0.4, title='Genes assortativity for gene age')
+```
