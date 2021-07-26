@@ -1,0 +1,71 @@
+---
+title: "Untitled"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+library(chaser)
+library(igraph)
+library(RCy3)
+setwd("C:/Users/Delouche Alexis/Desktop/stage")
+wd<-getwd()
+#loading the network
+datapath<-paste0(wd,"/data/PCHiC_peak_matrix_cutoff5_Mono.tsv")
+pchic<-read.table(datapath, header = TRUE)
+
+#filtering the network datas
+pchic=pchic[which(pchic$Mon>=5),]
+pchic=pchic[which(pchic$oeName!="."),]
+
+#making a chromnet Object
+net<-chaser::make_chromnet(pchic[,c(1,2,3,6,7,8)])
+```
+
+
+```{r}
+datapath<-paste0(wd,"/data/feat_gene_age_num3.0.txt")
+gene_age<-read.table(datapath, header=TRUE)
+net<-chaser::load_features(net, gene_age, type="features_table", missingv=11, auxfun = "min")
+net_chas<-chaser::chas(net)
+print(net_chas)
+```
+
+
+
+Display the specific network for each gene age value for chromosome 1
+```{r}
+
+#net1<-chaser::subset_chromnet(net, chrom =1)
+# subnetwork of net to have only chromosome 1
+ 
+#ignet<-chaser::export(net1,"igraph")
+ignet<-chaser::export(net,"igraph")
+write.csv(get.vertex.attribute(ignet), file="C:/Users/Delouche Alexis/Desktop/stage/data/ignet3.0/attributes.csv")
+
+# opening a corresponding table  of geneage name and net1$features
+datapath<-paste0(wd,"/data/table_age_gene_num2.0.txt")
+corresp_table<-read.table(datapath, sep = " ", header = TRUE)
+```
+
+
+```{r}
+for (i in corresp_table[,2]){
+  V(ignet)$color<-ifelse(V(ignet)$AgeGene<=i,"orange","yellow")
+  #There are some special igraph functions that can be used only in expressions indexing edge sequences:.inc takes a vertex sequence, and selects all edges that have at least one incident vertex in the vertex sequence
+  #is similar to .inc(), but only the heads of the edges are considered.
+  #select all edges coming from the vertex that are equal or inferior to i
+  edges<-E(ignet)[inc(V(ignet)[AgeGene<=i])]
+  ignet3 <- subgraph.edges(ignet, edges)
+  #select only the nodes that have gene age inferior to i
+  nodes<-V(ignet3)[V(ignet3)$AgeGene<=i]
+  ignet3 <- induced_subgraph(ignet3, vids=nodes)
+  #does an IG object from the selected edges
+  #plot(ignet3, vertex.label=NA, edge.label=NA, main=paste(corresp_table[i,1],"network"), min = -10, max=10)
+  #plotting graph
+  tab_edge<-as.data.frame(get.edgelist(ignet3))
+  write.csv(tab_edge, file = paste0("C:/Users/Delouche Alexis/Desktop/stage/data/ignet3.0",paste0("/",i,corresp_table[i,1]," network.csv")))
+}
+
+```
